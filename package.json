@@ -18,7 +18,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/zemirco/lockit-utilities"
+    "url": "https://github.com/killerbobjr/lockit-utilities"
   },
   "devDependencies": {
     "mocha": "^2.2.5",

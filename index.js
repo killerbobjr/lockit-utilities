@@ -33,9 +33,16 @@ exports.restrict = function(config) {
   config = config || {};
   var route = (config.login && config.login.route) || '/login';
 
-  return function(req, res, next) {
-    if (req.session.loggedIn) {return next(); }
-    if (config.rest) {return res.send(401); }
+  return function(req, res, next)
+  {
+    if (req.user && req.user.loggedIn)
+	{
+		return next();
+	}
+    if (config.rest)
+	{
+		return res.send(401);
+	}
     res.redirect(route + '?redirect=' + req.originalUrl);
   };
 
