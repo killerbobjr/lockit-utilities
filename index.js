@@ -1,8 +1,8 @@
 'use strict';
 
-var url = require('url');
-var base32 = require('thirty-two');
-var totp = require('notp').totp;
+var	url = require('url'),
+	base32 = require('thirty-two'),
+	totp = require('otplib').authenticator;
 
 /**
  * Prevent users who aren't logged-in from accessing routes.
@@ -28,24 +28,24 @@ var totp = require('notp').totp;
  * @param {Object} [config] - Configuration object
  * @param {String} [config.login.route='/login'] - Route that handles the login process
  */
-exports.restrict = function(config) {
+exports.restrict = function(config)
+{
+	config = config ||
+	{};
+	var route = (config.login && config.login.route) || '/login';
 
-  config = config || {};
-  var route = (config.login && config.login.route) || '/login';
-
-  return function(req, res, next)
-  {
-    if (req.user && req.user.loggedIn)
+	return function(req, res, next)
 	{
-		return next();
-	}
-    if (config.rest)
-	{
-		return res.send(401);
-	}
-    res.redirect(route + '?redirect=' + req.originalUrl);
-  };
-
+		if(req.user && req.user.loggedIn)
+		{
+			return next();
+		}
+		if(config.rest)
+		{
+			return res.send(401);
+		}
+		res.redirect(route + '?redirect=' + req.originalUrl);
+	};
 };
 
 /**
@@ -80,41 +80,39 @@ exports.restrict = function(config) {
  *
  * @returns {Object} Object containing database `type` and `adapter`
  */
-exports.getDatabase = function(config) {
+exports.getDatabase = function(config)
+{
+	var uri = config.db.url || config.db;
+	var urlObj = url.parse(uri);
+	var prot = urlObj.protocol;
+	var res = {};
 
-  var uri = config.db.url || config.db;
+	switch(prot)
+	{
+		case 'http:':
+		case 'https:':
+			res.type = 'couchdb';
+			res.adapter = 'lockit-couchdb-adapter';
+			break;
+		case 'mongodb:':
+			res.type = 'mongodb';
+			res.adapter = 'lockit-mongodb-adapter';
+			break;
+		case 'postgres:':
+			res.type = 'postgresql';
+			res.adapter = 'lockit-sql-adapter';
+			break;
+		case 'mysql:':
+			res.type = 'mysql';
+			res.adapter = 'lockit-sql-adapter';
+			break;
+		case 'sqlite:':
+			res.type = 'sqlite';
+			res.adapter = 'lockit-sql-adapter';
+			break;
+	}
 
-  var urlObj = url.parse(uri);
-  var prot = urlObj.protocol;
-
-  var res = {};
-
-  switch (prot) {
-    case 'http:':
-    case 'https:':
-      res.type = 'couchdb';
-      res.adapter = 'lockit-couchdb-adapter';
-      break;
-    case 'mongodb:':
-      res.type = 'mongodb';
-      res.adapter = 'lockit-mongodb-adapter';
-      break;
-    case 'postgres:':
-      res.type = 'postgresql';
-      res.adapter = 'lockit-sql-adapter';
-      break;
-    case 'mysql:':
-      res.type = 'mysql';
-      res.adapter = 'lockit-sql-adapter';
-      break;
-    case 'sqlite:':
-      res.type = 'sqlite';
-      res.adapter = 'lockit-sql-adapter';
-      break;
-  }
-
-  return res;
-
+	return res;
 };
 
 /**
@@ -135,18 +133,40 @@ exports.getDatabase = function(config) {
  *
  * @returns {String} URL for QR code
  */
-exports.qr = function(config) {
+exports.qr = function(config)
+{
+	var key = config.key;
+	var email = config.email;
+	var issuer = config.issuer || 'Lockit';
+	var label = issuer + ':' + email;
+	var encoded = base32.encode(key);
+	var uri = encodeURIComponent('otpauth://totp/' + label + '?secret=' + encoded + '&issuer=' + issuer);
+	var api = 'https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=';
+	return api + uri;
+};
 
-  var key = config.key;
-  var email = config.email;
-  var issuer = config.issuer || 'Lockit';
-
-  var label = issuer + ':' + email;
-  var encoded = base32.encode(key);
-  var uri = encodeURIComponent('otpauth://totp/' + label + '?secret=' + encoded + '&issuer=' + issuer);
-  var api = 'https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=';
-  return api + uri;
-
+/**
+ * Generate a two-factor authentication token, uses [time-based one-time password algorithm (totp)](http://en.wikipedia.org/wiki/Time-based_One-time_Password_Algorithm).
+ * To be used with [Google Authenticator](https://support.google.com/accounts/answer/1066447?hl=en).
+ *
+ * @example
+   var key = 'abcd1234';
+   var token = util.generate(key);
+   
+   return token;
+ *
+ * @param {String} key - The individual key for the user
+ * @param {Object} [options] - Options object for
+ *   [notp#totp.verify](https://github.com/guyht/notp#totpverifytoken-key-opt)
+ * @param {String} [options.window=6] - Allowable margin for counter
+ * @param {Number} [options.time=30] - Time step of counter in seconds
+ *
+ * @returns {String} token if valid
+ */
+exports.generate = function(key, options)
+{
+	var	opts = options || {};
+	return totp.generate(key, opts);
 };
 
 /**
@@ -170,13 +190,10 @@ exports.qr = function(config) {
  *
  * @returns {Boolean} `true` if token is valid
  */
-exports.verify = function(token, key, options) {
-
-  options = options || {};
-
-  var verified = totp.verify(token, key, options);
-  return (verified && verified.delta === 0);
-
+exports.verify = function(token, key, options)
+{
+	var	opts = options || {};
+	return totp.check(token, key, opts);
 };
 
 /**
@@ -190,24 +207,28 @@ exports.verify = function(token, key, options) {
  * @param {Object} req - The default Express request object
  * @param {Function} done - Function executed when session is destroyed
  */
-exports.destroy = function(req, done) {
-
-  if (req.sessionStore) {return req.session.regenerate(done); }
-  req.session = null;
-  done();
-
+exports.destroy = function(req, done)
+{
+	if(req.sessionStore)
+	{
+		return req.session.regenerate(done);
+	}
+	req.session = null;
+	done();
 };
 
 
 
 // private helper function
-function pipe(source, target) {
-  var emit = source.emit;
-  source.emit = function () {
-    emit.apply(source, arguments);
-    target.emit.apply(target, arguments);
-    return source;
-  };
+function pipe(source, target)
+{
+	var emit = source.emit;
+	source.emit = function()
+	{
+		emit.apply(source, arguments);
+		target.emit.apply(target, arguments);
+		return source;
+	};
 }
 
 
@@ -241,14 +262,17 @@ function pipe(source, target) {
  * @param {Object|Array} source - Single event emitter or Array of event emitters
  * @param {Object} target - Single event emitter
  */
-exports.pipe = function(source, target) {
+exports.pipe = function(source, target)
+{
+	var isArray = Array.isArray(source);
 
-  var isArray = Array.isArray(source);
+	if(!isArray)
+	{
+		return pipe(source, target);
+	}
 
-  if (!isArray) {return pipe(source, target); }
-
-  source.forEach(function(event) {
-    pipe(event, target);
-  });
-
+	source.forEach(function(event)
+	{
+		pipe(event, target);
+	});
 };
