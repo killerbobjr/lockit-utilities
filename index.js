@@ -1,4 +1,4 @@
-'use strict';
+'use strict()';
 
 var	url = require('url'),
 	base32 = require('thirty-two'),
