@@ -2,7 +2,7 @@
 
 var	url = require('url'),
 	base32 = require('thirty-two'),
-	totp = require('otplib').authenticator;
+	totp = require('notp').totp;
 
 /**
  * Prevent users who aren't logged-in from accessing routes.
@@ -157,8 +157,8 @@ exports.qr = function(config)
  *
  * @param {String} key - The individual key for the user
  * @param {Object} [options] - Options object for
+ * @param {Object} [options] - Options object for
  *   [notp#totp.verify](https://github.com/guyht/notp#totpverifytoken-key-opt)
- * @param {String} [options.window=6] - Allowable margin for counter
  * @param {Number} [options.time=30] - Time step of counter in seconds
  *
  * @returns {String} token if valid
@@ -166,7 +166,7 @@ exports.qr = function(config)
 exports.generate = function(key, options)
 {
 	var	opts = options || {};
-	return totp.generate(key, opts);
+	return totp.gen(key, opts);
 };
 
 /**
@@ -192,8 +192,10 @@ exports.generate = function(key, options)
  */
 exports.verify = function(token, key, options)
 {
-	var	opts = options || {};
-	return totp.check(token, key, opts);
+	var	opts = options || {},
+		verified = totp.verify(token, key, opts);
+
+	return (verified && verified.delta === 0);
 };
 
 /**
