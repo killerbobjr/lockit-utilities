@@ -95,6 +95,7 @@ exports.getDatabase = function(config)
 			res.adapter = 'lockit-couchdb-adapter';
 			break;
 		case 'mongodb:':
+		case 'mongodb+srv:':
 			res.type = 'mongodb';
 			res.adapter = 'lockit-mongodb-adapter';
 			break;
